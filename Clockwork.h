@@ -18,6 +18,7 @@
 #include "Tasks/Task.h"
 #include "Tasks/TaskBase.h"
 #include "Tasks/WorkerTask.h"
+#include "Threadpool.h"
 
 ///----------------------------------------------------------------------------------------------------
 /// Raidcore::Clockwork Namespace
@@ -73,20 +74,16 @@ namespace Raidcore::Clockwork
 		/// QueueTask:
 		/// 	Queues a task to the threadpool, waiting for completion.
 		///----------------------------------------------------------------------------------------------------
-		void QueueTask(ETaskPriority aPriority, std::shared_ptr<ITask> aTask);
-
+		void QueueTask(uint32_t aPool, ETaskPriority aPriority, std::shared_ptr<ITask> aTask);
+		
 		Context(Context const&) = delete;
 		void operator=(Context const&) = delete;
 
 		private:
-		bool                                  IsRunning{ false };
-		uint32_t                              ThreadPoolCount{ 1 };
-		uint32_t                              ThreadPoolSize{ 1 };
-		std::vector<std::vector<std::thread>> ThreadPools{};
-
-		std::mutex                            TaskMutex{};
-		std::condition_variable               TaskConVar{};
-		std::queue<std::shared_ptr<ITask>>    TaskQueue[static_cast<uint32_t>(ETaskPriority::COUNT)]{};
+		bool                     IsRunning{ false };
+		uint32_t                 ThreadPoolCount{ 1 };
+		uint32_t                 ThreadPoolSize{ 1 };
+		std::vector<Threadpool*> ThreadPools{};
 
 		///----------------------------------------------------------------------------------------------------
 		/// ctor
@@ -99,10 +96,16 @@ namespace Raidcore::Clockwork
 		~Context();
 
 		///----------------------------------------------------------------------------------------------------
+		/// WorkerSetup:
+		/// 	Setup function for the worker threads.
+		///----------------------------------------------------------------------------------------------------
+		void WorkerSetup(uint32_t aPool, uint32_t aThread);
+
+		///----------------------------------------------------------------------------------------------------
 		/// WorkerLoop:
 		/// 	Loop function for the worker threads.
 		///----------------------------------------------------------------------------------------------------
-		void WorkerLoop();
+		void WorkerLoop(Threadpool* aPool);
 	};
 
 	///----------------------------------------------------------------------------------------------------
@@ -112,12 +115,22 @@ namespace Raidcore::Clockwork
 	template <typename T>
 	std::shared_ptr<Task<T>> Run(ETaskPriority aPriority, Action<T> aAction)
 	{
+		return Run(0, aPriority, aAction);
+	}
+
+	///----------------------------------------------------------------------------------------------------
+	/// Run:
+	/// 	Runs an action asynchronously and returns a Task object associated with it, that can be awaited.
+	///----------------------------------------------------------------------------------------------------
+	template <typename T>
+	std::shared_ptr<Task<T>> Run(uint32_t aPool, ETaskPriority aPriority, Action<T> aAction)
+	{
 		Context* ctx = Context::Get();
 		RC_ASSERT(ctx);
 
 		std::shared_ptr<Task<T>> task = std::make_shared<Task<T>>(aAction);
 
-		ctx->QueueTask(aPriority, task);
+		ctx->QueueTask(aPool, aPriority, task);
 
 		return task;
 	}

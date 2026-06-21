@@ -43,46 +43,37 @@ namespace Raidcore::Clockwork
 
 		this->IsRunning = true;
 
-		for (size_t i = 0; i < this->ThreadPoolCount; i++)
+		for (uint32_t i = 0; i < this->ThreadPoolCount; i++)
 		{
-			std::vector<std::thread> pool{};
-			pool.reserve(this->ThreadPoolSize);
+			Threadpool* pool = new Threadpool{};
+			pool->Threads.reserve(this->ThreadPoolSize);
 
 			for (uint32_t j = 0; j < this->ThreadPoolSize; j++)
 			{
-				pool.emplace_back([this, i, j]()
+				pool->Threads.emplace_back([this, pool, i, j]()
 				{
-#if defined(_WIN32)
-					uint32_t hwThreads = std::thread::hardware_concurrency();
-					uint32_t coreCount = hwThreads > 1 ? hwThreads : 1;
-
-					DWORD_PTR mask = (DWORD_PTR(1) << (j % coreCount));
-
-					SetThreadAffinityMask(GetCurrentThread(), mask);
-
-					std::wstring name = L"RC_Clockwork_WorkerThread_" + std::to_wstring(i) + L"_" + std::to_wstring(j);
-					SetThreadDescription(GetCurrentThread(), name.c_str());
-#elif defined(__linux__)
-					throw "NOT IMPLEMENTED";
-#endif
-
-					WorkerLoop();
+					this->WorkerSetup(i, j);
+					this->WorkerLoop(pool);
 				});
 			}
 
-			this->ThreadPools.emplace_back(std::move(pool));
+			this->ThreadPools.emplace_back(pool);
 		}
 	}
 
-	void Context::QueueTask(ETaskPriority aPriority, std::shared_ptr<ITask> aTask)
+	void Context::QueueTask(uint32_t aPool, ETaskPriority aPriority, std::shared_ptr<ITask> aTask)
 	{
-		std::lock_guard<std::mutex> lock(this->TaskMutex);
+		RC_ASSERT(aPool <= this->ThreadPoolCount);
+
+		Threadpool* pool = this->ThreadPools[aPool];
+
+		std::lock_guard<std::mutex> lock(pool->TaskMutex);
 
 		RC_ASSERT(aPriority < ETaskPriority::COUNT);
 
-		this->TaskQueue[static_cast<uint32_t>(aPriority)].push(aTask);
+		pool->TaskQueue[static_cast<uint32_t>(aPriority)].push(aTask);
 
-		this->TaskConVar.notify_one();
+		pool->TaskConVar.notify_one();
 	}
 	
 	Context::Context(uint32_t aThreadPoolCount, uint32_t aThreadPoolSize)
@@ -116,35 +107,56 @@ namespace Raidcore::Clockwork
 		}
 
 		this->IsRunning = false;
-		this->TaskConVar.notify_all();
 
 		for (size_t i = 0; i < this->ThreadPoolCount; i++)
 		{
+			Threadpool* pool = this->ThreadPools[i];
+			pool->TaskConVar.notify_all();
+
 			for (uint32_t j = 0; j < this->ThreadPoolSize; j++)
 			{
-				if (this->ThreadPools[i][j].joinable())
+				if (pool->Threads[j].joinable())
 				{
-					this->ThreadPools[i][j].join();
+					pool->Threads[j].join();
 				}
 			}
+
+			delete pool;
 		}
 	}
 
-	void Context::WorkerLoop()
+	void Context::WorkerSetup(uint32_t aPool, uint32_t aThread)
+	{
+		uint32_t hwThreads = std::thread::hardware_concurrency();
+		uint32_t coreCount = hwThreads > 1 ? hwThreads : 1;
+
+		std::wstring name = L"RC_Clockwork_WorkerThread_" + std::to_wstring(aPool) + L"_" + std::to_wstring(aThread);
+
+#if defined(_WIN32)
+		DWORD_PTR mask = (DWORD_PTR(1) << (aThread % coreCount));
+
+		SetThreadAffinityMask(GetCurrentThread(), mask);
+		SetThreadDescription(GetCurrentThread(), name.c_str());
+#elif defined(__linux__)
+		throw "NOT IMPLEMENTED";
+#endif
+	}
+
+	void Context::WorkerLoop(Threadpool* aPool)
 	{
 		while (this->IsRunning)
 		{
 			std::shared_ptr<ITask> task = nullptr;
 
 			{
-				std::unique_lock lock(this->TaskMutex);
+				std::unique_lock lock(aPool->TaskMutex);
 
-				this->TaskConVar.wait(lock, [this] {
+				aPool->TaskConVar.wait(lock, [this, &aPool] {
 					return !this->IsRunning
-						|| !this->TaskQueue[static_cast<uint32_t>(ETaskPriority::Immediate)].empty()
-						|| !this->TaskQueue[static_cast<uint32_t>(ETaskPriority::High)].empty()
-						|| !this->TaskQueue[static_cast<uint32_t>(ETaskPriority::Normal)].empty()
-						|| !this->TaskQueue[static_cast<uint32_t>(ETaskPriority::Low)].empty();
+						|| !aPool->TaskQueue[static_cast<uint32_t>(ETaskPriority::Immediate)].empty()
+						|| !aPool->TaskQueue[static_cast<uint32_t>(ETaskPriority::High)].empty()
+						|| !aPool->TaskQueue[static_cast<uint32_t>(ETaskPriority::Normal)].empty()
+						|| !aPool->TaskQueue[static_cast<uint32_t>(ETaskPriority::Low)].empty();
 				});
 
 				if (!this->IsRunning)
@@ -154,16 +166,16 @@ namespace Raidcore::Clockwork
 
 				for (uint32_t i = static_cast<uint32_t>(ETaskPriority::COUNT); i > 0; i--)
 				{
-					if (this->TaskQueue[i - 1].empty())
+					if (aPool->TaskQueue[i - 1].empty())
 					{
 						continue;
 					}
 
-					task = this->TaskQueue[i - 1].front();
+					task = aPool->TaskQueue[i - 1].front();
 
 					if (task)
 					{
-						this->TaskQueue[i - 1].pop();
+						aPool->TaskQueue[i - 1].pop();
 						break;
 					}
 				}

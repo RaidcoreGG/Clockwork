@@ -1,7 +1,7 @@
 # Clockwork++
 Clockwork++ is a bloat-free async library for C++17. Its goal is to simplify async programming as much as other programming languages with built-in support.
 
-It was primarily designed for game engines and supports multiple threadpools.
+It was primarily designed for game engines and supports multiple threadpools, for example to create dedicated ones for `Socket`, `IO`, `Compute` and so on.
 
 ## Usage
 ### Simple Asynchronous Operations
