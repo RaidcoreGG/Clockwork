@@ -1,49 +1,41 @@
 ///----------------------------------------------------------------------------------------------------
 /// Copyright (c) Raidcore.GG - All rights reserved.
 ///
-/// Name         :  TaskBase.h
-/// Description  :  Definition for the Task interface class.
+/// Name         :  CancellationToken.h
+/// Description  :  Definition for the CancellationToken.
 /// Authors      :  K. Bieniek
 ///----------------------------------------------------------------------------------------------------
 
 #pragma once
 
 #include <atomic>
-#include <functional>
-
-#include "CancellationToken.h"
 
 ///----------------------------------------------------------------------------------------------------
 /// Raidcore::Clockwork Namespace
 ///----------------------------------------------------------------------------------------------------
 namespace Raidcore::Clockwork
 {
-	template<typename T>
-	using Action = std::function<T(CancellationToken aToken)>;
-
-	using WorkAction = std::function<void(CancellationToken aToken)>;
-
 	///----------------------------------------------------------------------------------------------------
-	/// ITask Interface Class
+	/// CancellationToken Class
 	///----------------------------------------------------------------------------------------------------
-	class ITask
+	class CancellationToken
 	{
-		private:
-		std::atomic<bool> IsCancelled{ false };
-
 		public:
-		friend class Context;
+		///----------------------------------------------------------------------------------------------------
+		/// ctor
+		///----------------------------------------------------------------------------------------------------
+		explicit CancellationToken(const std::atomic<bool>* aFlag) : Flag(aFlag) {}
 
 		///----------------------------------------------------------------------------------------------------
-		/// Execute:
-		/// 	Executes the stored method of the ask.
+		/// IsCancelled:
+		/// 	Returns true, if the underlying flag was set to false.
 		///----------------------------------------------------------------------------------------------------
-		virtual void Execute(CancellationToken aToken) = 0;
+		inline bool IsCancelled() const
+		{
+			return this->Flag->load(std::memory_order::relaxed);
+		}
 
-		///----------------------------------------------------------------------------------------------------
-		/// Cancel:
-		/// 	Cancels the task, without yielding the result.
-		///----------------------------------------------------------------------------------------------------
-		void Cancel();
+		private:
+		const std::atomic<bool>* Flag{ nullptr };
 	};
 }
