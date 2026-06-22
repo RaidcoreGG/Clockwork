@@ -71,7 +71,10 @@ namespace Raidcore::Clockwork
 
 		RC_ASSERT(aPriority < ETaskPriority::COUNT);
 
+#pragma warning( push )
+#pragma warning( disable : 33011 )
 		pool->TaskQueue[static_cast<uint32_t>(aPriority)].push(aTask);
+#pragma warning( pop )
 
 		pool->TaskConVar.notify_one();
 	}
