@@ -11,7 +11,6 @@
 #include <future>
 #include <type_traits>
 
-#include "ETaskPriority.h"
 #include "TaskBase.h"
 
 ///----------------------------------------------------------------------------------------------------

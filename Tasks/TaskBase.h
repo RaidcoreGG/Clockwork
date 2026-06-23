@@ -21,7 +21,7 @@ namespace Raidcore::Clockwork
 	template<typename T>
 	using Action = std::function<T(CancellationToken aToken)>;
 
-	using WorkAction = std::function<void(CancellationToken aToken)>;
+	using WorkAction = Action<void>;
 
 	///----------------------------------------------------------------------------------------------------
 	/// ITask Interface Class

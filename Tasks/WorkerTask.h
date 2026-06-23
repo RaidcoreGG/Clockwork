@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <future>
+
 #include "TaskBase.h"
 
 ///----------------------------------------------------------------------------------------------------
@@ -29,5 +31,8 @@ namespace Raidcore::Clockwork
 
 		private:
 		WorkAction Method{};
+
+		std::promise<void> Promise;
+		std::future<void>  Future;
 	};
 }
