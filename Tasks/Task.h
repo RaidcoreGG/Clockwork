@@ -23,7 +23,7 @@ namespace Raidcore::Clockwork
 	/// Task Class
 	///----------------------------------------------------------------------------------------------------
 	template <typename T>
-	class Task : public ITask
+	class Task : public virtual ITask
 	{
 		public:
 		///----------------------------------------------------------------------------------------------------
