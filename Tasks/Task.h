@@ -9,6 +9,7 @@
 #pragma once
 
 #include <future>
+#include <optional>
 #include <type_traits>
 
 #include "TaskBase.h"
@@ -30,7 +31,7 @@ namespace Raidcore::Clockwork
 		///----------------------------------------------------------------------------------------------------
 		Task(Action<T> aAction) : Method(aAction)
 		{
-			this->Future = Promise.get_future();
+			this->Future = this->Promise.get_future().share();
 		}
 
 		///----------------------------------------------------------------------------------------------------
@@ -46,6 +47,32 @@ namespace Raidcore::Clockwork
 			else
 			{
 				return this->Future.get();
+			}
+		}
+
+		///----------------------------------------------------------------------------------------------------
+		/// Completed:
+		/// 	Returns true if the task has completed, false otherwise.
+		///----------------------------------------------------------------------------------------------------
+		bool Completed() const
+		{
+			return this->Future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+		}
+
+		///----------------------------------------------------------------------------------------------------
+		/// Result:
+		/// 	Returns the result of the task, if there is one.
+		/// 	If the task has not completed yet, this will block until it does.
+		///----------------------------------------------------------------------------------------------------
+		T Result()
+		{
+			if constexpr (std::is_void_v<T>)
+			{
+				this->Await();
+			}
+			else
+			{
+				return this->Await();
 			}
 		}
 
@@ -77,9 +104,9 @@ namespace Raidcore::Clockwork
 		}
 
 		private:
-		Action<T>       Method{};
+		Action<T>             Method{};
 
-		std::promise<T> Promise;
-		std::future<T>  Future;
+		std::promise<T>       Promise;
+		std::shared_future<T> Future;
 	};
 }
