@@ -21,7 +21,7 @@ namespace Raidcore::Clockwork
 	class ScheduledTask : public virtual ITask
 	{
 		private:
-		uint64_t   IntervalMs{ 0 };
-		WorkAction Method{};
+		uint64_t     IntervalMs{ 0 };
+		Action<void> Method{};
 	};
 }

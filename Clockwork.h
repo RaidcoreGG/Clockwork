@@ -19,7 +19,6 @@
 #include "Tasks/ScheduledTask.h"
 #include "Tasks/Task.h"
 #include "Tasks/TaskBase.h"
-#include "Tasks/WorkerTask.h"
 
 ///----------------------------------------------------------------------------------------------------
 /// Raidcore::Clockwork Namespace
@@ -157,24 +156,4 @@ namespace Raidcore::Clockwork
 		Context* ctx = Context::Get();
 		RC_ASSERT(ctx);
 	}*/
-
-	///----------------------------------------------------------------------------------------------------
-	/// CreateWorker:
-	/// 	Creates a worker action, that runs when work is queued.
-	///----------------------------------------------------------------------------------------------------
-	static std::shared_ptr<WorkerTask> CreateWorker(uint32_t aPool, ETaskPriority aPriority, WorkAction aAction)
-	{
-		std::shared_ptr<WorkerTask> worker = std::make_shared<WorkerTask>(aAction, aPool, aPriority);
-
-		return worker;
-	}
-
-	///----------------------------------------------------------------------------------------------------
-	/// CreateWorker:
-	/// 	Creates a worker action, that runs when work is queued.
-	///----------------------------------------------------------------------------------------------------
-	static std::shared_ptr<WorkerTask> CreateWorker(WorkAction aAction)
-	{
-		return Raidcore::Clockwork::CreateWorker(0, ETaskPriority::Low, aAction);
-	}
 }

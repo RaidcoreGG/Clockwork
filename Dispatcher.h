@@ -1,114 +1,107 @@
 ///----------------------------------------------------------------------------------------------------
 /// Copyright (c) Raidcore.GG - All rights reserved.
 ///
-/// Name         :  Task.h
-/// Description  :  Definition for the Task class.
+/// Name         :  Dispatcher.h
+/// Description  :  Definition for the Dispatcher class.
 /// Authors      :  K. Bieniek
 ///----------------------------------------------------------------------------------------------------
 
 #pragma once
 
-#include <future>
-#include <optional>
-#include <type_traits>
-
-#include "TaskBase.h"
+#include "Clockwork.h"
+#include "Tasks/ETaskPriority.h"
+#include "Tasks/TaskBase.h"
 
 ///----------------------------------------------------------------------------------------------------
 /// Raidcore::Clockwork Namespace
 ///----------------------------------------------------------------------------------------------------
 namespace Raidcore::Clockwork
 {
-	class Context;
-
 	///----------------------------------------------------------------------------------------------------
-	/// Task Class
+	/// Dispatcher Class
 	///----------------------------------------------------------------------------------------------------
 	template <typename T>
-	class Task : public virtual ITask
+	class Dispatcher
 	{
 		public:
 		///----------------------------------------------------------------------------------------------------
 		/// ctor
 		///----------------------------------------------------------------------------------------------------
-		Task(Action<T> aAction) : Method(std::move(aAction))
+		Dispatcher()
+			: Method()
+			, Pool(0)
+			, Priority(ETaskPriority::Low)
+		{}
+
+		///----------------------------------------------------------------------------------------------------
+		/// ctor
+		///----------------------------------------------------------------------------------------------------
+		Dispatcher(Action<T> aAction, uint32_t aPool = 0, ETaskPriority aPriority = ETaskPriority::Low)
+			: Method(std::move(aAction))
+			, Pool(aPool)
+			, Priority(aPriority)
+		{}
+
+		///----------------------------------------------------------------------------------------------------
+		/// SetAction:
+		/// 	Sets the action for the dispatcher.
+		///----------------------------------------------------------------------------------------------------
+		void SetAction(Action<T> aAction)
 		{
-			this->Future = this->Promise.get_future().share();
+			this->Method = std::move(aAction);
 		}
 
 		///----------------------------------------------------------------------------------------------------
-		/// Await:
-		/// 	Waits for the task to complete and then returns its result, if there is one.
+		/// SetPool:
+		/// 	Sets the pool for the dispatcher.
 		///----------------------------------------------------------------------------------------------------
-		T Await()
+		void SetPool(uint32_t aPool)
 		{
-			if constexpr (std::is_void_v<T>)
-			{
-				this->Future.get();
-			}
-			else
-			{
-				return this->Future.get();
-			}
+			this->Pool = aPool;
 		}
 
 		///----------------------------------------------------------------------------------------------------
-		/// Completed:
-		/// 	Returns true if the task has completed, false otherwise.
+		/// SetPriority:
+		/// 	Sets the priority for the dispatcher.
 		///----------------------------------------------------------------------------------------------------
-		bool Completed() const
+		void SetPriority(ETaskPriority aPriority)
 		{
-			return this->Future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+			this->Priority = aPriority;
 		}
 
 		///----------------------------------------------------------------------------------------------------
-		/// Result:
-		/// 	Returns the result of the task, if there is one.
-		/// 	If the task has not completed yet, this will block until it does.
+		/// Dispatch:
+		/// 	Dispatches a worker task.
 		///----------------------------------------------------------------------------------------------------
-		T Result()
+		std::shared_ptr<Task<T>> Dispatch()
 		{
-			if constexpr (std::is_void_v<T>)
-			{
-				this->Await();
-			}
-			else
-			{
-				return this->Await();
-			}
+			RC_ASSERT(this->Method && "Dispatcher Method is not set.");
+
+			return Raidcore::Clockwork::Run<T>(
+				this->Pool,
+				this->Priority,
+				this->Method
+			);
+		}
+
+		///----------------------------------------------------------------------------------------------------
+		/// operator():
+		/// 	Dispatches a worker task.
+		///----------------------------------------------------------------------------------------------------
+		std::shared_ptr<Task<T>> operator()() const
+		{
+			RC_ASSERT(this->Method && "Dispatcher Method is not set.");
+
+			return Raidcore::Clockwork::Run<T>(
+				this->Pool,
+				this->Priority,
+				this->Method
+			);
 		}
 
 		private:
-		friend class Raidcore::Clockwork::Context;
-
-		///----------------------------------------------------------------------------------------------------
-		/// Execute:
-		/// 	Executes the method associated with the task.
-		///----------------------------------------------------------------------------------------------------
-		void Execute(CancellationToken aToken) override
-		{
-			try
-			{
-				if constexpr (std::is_void_v<T>)
-				{
-					this->Method(aToken);
-					this->Promise.set_value();
-				}
-				else
-				{
-					this->Promise.set_value(this->Method(aToken));
-				}
-			}
-			catch (...)
-			{
-				this->Promise.set_exception(std::current_exception());
-			}
-		}
-
-		private:
-		Action<T>             Method{};
-
-		std::promise<T>       Promise;
-		std::shared_future<T> Future;
+		Action<T>     Method  {};
+		uint32_t      Pool    { 0 };
+		ETaskPriority Priority{ ETaskPriority::Low };
 	};
 }

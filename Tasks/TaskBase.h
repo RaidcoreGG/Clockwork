@@ -18,10 +18,10 @@
 ///----------------------------------------------------------------------------------------------------
 namespace Raidcore::Clockwork
 {
+	class Context;
+
 	template<typename T>
 	using Action = std::function<T(CancellationToken aToken)>;
-
-	using WorkAction = Action<void>;
 
 	///----------------------------------------------------------------------------------------------------
 	/// ITask Interface Class
@@ -39,7 +39,7 @@ namespace Raidcore::Clockwork
 		void Cancel();
 
 		private:
-		friend class Context;
+		friend class Raidcore::Clockwork::Context;
 
 		///----------------------------------------------------------------------------------------------------
 		/// Execute:
