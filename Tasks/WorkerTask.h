@@ -8,8 +8,7 @@
 
 #pragma once
 
-#include <future>
-
+#include "ETaskPriority.h"
 #include "TaskBase.h"
 
 ///----------------------------------------------------------------------------------------------------
@@ -20,19 +19,35 @@ namespace Raidcore::Clockwork
 	///----------------------------------------------------------------------------------------------------
 	/// WorkerTask Class
 	///----------------------------------------------------------------------------------------------------
-	class WorkerTask : ITask
+	class WorkerTask : public virtual ITask
 	{
 		public:
 		///----------------------------------------------------------------------------------------------------
-		/// Wake:
-		/// 	Wakes the workers, telling it work has arrived.
+		/// ctor
 		///----------------------------------------------------------------------------------------------------
-		void Wake();
+		WorkerTask(WorkAction aAction, uint32_t aPool = 0, ETaskPriority aPriority = ETaskPriority::Low)
+			: Method(aAction)
+			, Pool(aPool)
+			, Priority(aPriority)
+		{}
+
+		///----------------------------------------------------------------------------------------------------
+		/// Dispatch:
+		/// 	Dispatches a worker task.
+		///----------------------------------------------------------------------------------------------------
+		void Dispatch();
 
 		private:
-		WorkAction Method{};
+		friend class Context;
 
-		std::promise<void> Promise;
-		std::future<void>  Future;
+		WorkAction    Method  {};
+		uint32_t      Pool    { 0 };
+		ETaskPriority Priority{ ETaskPriority::Low };
+
+		///----------------------------------------------------------------------------------------------------
+		/// Execute:
+		/// 	Executes the method associated with the task.
+		///----------------------------------------------------------------------------------------------------
+		void Execute(CancellationToken aToken) override;
 	};
 }

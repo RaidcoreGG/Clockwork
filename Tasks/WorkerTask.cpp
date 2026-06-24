@@ -8,9 +8,24 @@
 
 #include "WorkerTask.h"
 
+#include "../Clockwork.h"
+
 namespace Raidcore::Clockwork
 {
-	void WorkerTask::Wake()
+	void WorkerTask::Dispatch()
 	{
+		Raidcore::Clockwork::Run(this->Pool, this->Priority, this->Method);
+	}
+
+	void WorkerTask::Execute(CancellationToken aToken)
+	{
+		try
+		{
+			this->Method(aToken);
+		}
+		catch (...)
+		{
+			/* NOP */
+		}
 	}
 }

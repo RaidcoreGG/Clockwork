@@ -64,7 +64,6 @@ namespace Raidcore::Clockwork
 	void Context::QueueTask(uint32_t aPool, ETaskPriority aPriority, std::shared_ptr<ITask> aTask)
 	{
 		RC_ASSERT(aPool <= this->ThreadPoolCount);
-
 		Threadpool* pool = this->ThreadPools[aPool];
 
 		std::lock_guard<std::mutex> lock(pool->TaskMutex);
@@ -77,6 +76,16 @@ namespace Raidcore::Clockwork
 #pragma warning( pop )
 
 		pool->TaskConVar.notify_one();
+	}
+
+	void Context::StoreWorker(uint32_t aPool, std::shared_ptr<ITask> aWorkerTask)
+	{
+		RC_ASSERT(aPool <= this->ThreadPoolCount);
+		Threadpool* pool = this->ThreadPools[aPool];
+
+		std::lock_guard<std::mutex> lock(pool->WorkerMutex);
+
+		pool->Workers.push_back(aWorkerTask);
 	}
 	
 	Context::Context(uint32_t aThreadPoolCount, uint32_t aThreadPoolSize)
