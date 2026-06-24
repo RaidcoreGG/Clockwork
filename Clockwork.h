@@ -51,14 +51,11 @@ namespace Raidcore::Clockwork
 		///----------------------------------------------------------------------------------------------------
 		struct Threadpool
 		{
-			std::vector<std::thread>            Threads{};
+			std::vector<std::thread>           Threads{};
 
-			std::mutex                          TaskMutex{};
-			std::condition_variable             TaskConVar{};
-			std::queue<std::shared_ptr<ITask>>  TaskQueue[static_cast<uint32_t>(ETaskPriority::COUNT)]{};
-
-			std::mutex                          WorkerMutex{};
-			std::vector<std::shared_ptr<ITask>> Workers{};
+			std::mutex                         TaskMutex{};
+			std::condition_variable            TaskConVar{};
+			std::queue<std::shared_ptr<ITask>> TaskQueue[static_cast<uint32_t>(ETaskPriority::COUNT)]{};
 		};
 
 		public:
@@ -92,12 +89,6 @@ namespace Raidcore::Clockwork
 		///----------------------------------------------------------------------------------------------------
 		void QueueTask(uint32_t aPool, ETaskPriority aPriority, std::shared_ptr<ITask> aTask);
 		
-		///----------------------------------------------------------------------------------------------------
-		/// StoreWorker:
-		/// 	Stores a worker task in the threadpool, waiting for work.
-		///----------------------------------------------------------------------------------------------------
-		void StoreWorker(uint32_t aPool, std::shared_ptr<ITask> aWorkerTask);
-
 		Context(Context const&) = delete;
 		void operator=(Context const&) = delete;
 
@@ -173,12 +164,7 @@ namespace Raidcore::Clockwork
 	///----------------------------------------------------------------------------------------------------
 	static std::shared_ptr<WorkerTask> CreateWorker(uint32_t aPool, ETaskPriority aPriority, WorkAction aAction)
 	{
-		Context* ctx = Context::Get();
-		RC_ASSERT(ctx);
-
 		std::shared_ptr<WorkerTask> worker = std::make_shared<WorkerTask>(aAction, aPool, aPriority);
-
-		ctx->StoreWorker(aPool, worker);
 
 		return worker;
 	}
