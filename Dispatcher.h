@@ -75,13 +75,7 @@ namespace Raidcore::Clockwork
 		///----------------------------------------------------------------------------------------------------
 		std::shared_ptr<Task<T>> Dispatch()
 		{
-			RC_ASSERT(this->Method && "Dispatcher Method is not set.");
-
-			return Raidcore::Clockwork::Run<T>(
-				this->Pool,
-				this->Priority,
-				this->Method
-			);
+			this();
 		}
 
 		///----------------------------------------------------------------------------------------------------
