@@ -278,4 +278,4 @@ Inspiration for the library was drawn from [ArenaNet](https://arena.net/)'s Arch
 ---
 
 ## License
-Clockwork++ is a proprietary codebase. All rights reserved.
+Clockwork++ is licensed under the MIT license, see [LICENSE](LICENSE) for more information.
