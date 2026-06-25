@@ -2,23 +2,23 @@
 
 A lightweight asynchronous task scheduling library designed for high-performance applications and game engines.
 
+---
 ## The Pitch
 
 Clockwork++ was primarily designed for game engines and applications that require fine-grained control over asynchronous work. Unlike traditional thread pool implementations, Clockwork++ supports multiple independent thread pools, allowing workloads to be separated by responsibility.
 
 For example, dedicated pools can be created for:
 
-* Networking / Socket operations
-* File I/O
-* Asset streaming
-* Physics simulation
-* General compute workloads
-* Background maintenance tasks
+* Networking / Socket operations  
+* File I/O  
+* Asset streaming  
+* Physics simulation  
+* General compute workloads  
+* Background maintenance tasks  
 
 Tasks can be dispatched to a specific pool and assigned a priority, ensuring critical work is processed ahead of lower-priority jobs.
 
 ---
-
 ## Features
 
 * Multiple independent thread pools
@@ -26,6 +26,7 @@ Tasks can be dispatched to a specific pool and assigned a priority, ensuring cri
 * Awaitable task handles
 * Simple async execution API
 * Reusable dispatchers
+* Recurring scheduled tasks
 * Minimal dependencies
 * Designed for engine and real-time application workloads
 
@@ -40,14 +41,11 @@ Before dispatching any work, a Clockwork context must be created.
 ```cpp
 using namespace Raidcore::Clockwork;
 
-// Create 4 thread pools with automatic thread counts.
+// Create N thread pools with automatic thread counts.
 Context::Create(4);
 
 // Or specify both pool count and threads per pool.
 Context::Create(4, 2);
-```
-
-The context manages all worker threads and task queues.
 
 When shutting down:
 
@@ -70,28 +68,38 @@ auto task = Run<int>(
 	}
 );
 
-// Wait for completion.
 int result = task->Await();
 ```
 
-Tasks may also be dispatched directly to a specific thread pool.
+You can also dispatch directly to a specific pool:
 
 ```cpp
 auto task = Run<std::string>(
-	1, // Pool ID
+	1,
 	ETaskPriority::High,
 	[]()
 	{
 		return "Hello Clockwork";
 	}
 );
+
+std::string value = task->Await();
 ```
 
 ---
 
 ## Task Priorities
 
-Clockwork++ supports prioritized execution.
+Clockwork++ supports prioritized execution:
+
+| Priority  | Purpose                      |
+| --------- | ---------------------------- |
+| Immediate | Time-sensitive engine work   |
+| High      | Networking, gameplay systems |
+| Normal    | General application tasks    |
+| Low       | Background processing        |
+
+### Example
 
 ```cpp
 Run<void>(
@@ -111,24 +119,11 @@ Run<void>(
 );
 ```
 
-Higher-priority queues are processed before lower-priority queues within a thread pool.
-
-Typical usage:
-
-| Priority  | Purpose                      |
-| --------- | ---------------------------- |
-| Immediate | Time-sensitive engine work   |
-| High      | Networking, gameplay systems |
-| Normal    | General application tasks    |
-| Low       | Background processing        |
-
 ---
 
 ## Dispatchers
 
 A `Dispatcher<T>` stores a reusable asynchronous operation together with its target thread pool and priority.
-
-This is useful when the same task needs to be scheduled repeatedly. For example workers.
 
 ### Creating a Dispatcher
 
@@ -138,8 +133,8 @@ Dispatcher<int> dispatcher(
 	{
 		return PerformExpensiveCalculation();
 	},
-	2,                        // Pool
-	ETaskPriority::High       // Priority
+	2, // Pool ID
+	ETaskPriority::High
 );
 ```
 
@@ -147,11 +142,10 @@ Dispatcher<int> dispatcher(
 
 ```cpp
 auto task = dispatcher.Dispatch();
-
 int result = task->Await();
 ```
 
-The dispatcher can also be invoked directly.
+Or call it directly:
 
 ```cpp
 auto task = dispatcher();
@@ -161,20 +155,104 @@ auto task = dispatcher();
 
 ```cpp
 dispatcher.SetPool(1);
+dispatcher.SetPriority(ETaskPriority::Critical);
 
-dispatcher.SetPriority(
-	ETaskPriority::Critical
+dispatcher.SetAction([]()
+{
+	return GenerateData();
+});
+```
+
+---
+
+## Scheduled Tasks
+
+Scheduled tasks allow you to run recurring work at fixed intervals using the Clockwork context.
+
+They are ideal for:
+
+* Engine tick systems
+* Network polling
+* Heartbeats
+* Cleanup jobs
+* Periodic background maintenance
+
+---
+
+### Scheduling API
+
+```cpp
+static std::shared_ptr<ScheduledTask> Schedule(
+	uint32_t aPool,
+	std::chrono::milliseconds aInterval,
+	Action<void> aAction,
+	std::chrono::steady_clock::time_point aFirstExecution =
+		std::chrono::steady_clock::now()
 );
+```
 
-dispatcher.SetAction(
+```cpp
+static std::shared_ptr<ScheduledTask> Schedule(
+	std::chrono::milliseconds aInterval,
+	Action<void> aAction,
+	std::chrono::steady_clock::time_point aFirstExecution =
+		std::chrono::steady_clock::now()
+);
+```
+
+The second overload defaults to pool `0`.
+
+---
+
+### Basic Example
+
+```cpp
+auto task = Context::Schedule(
+	std::chrono::milliseconds(1000),
 	[]()
 	{
-		return GenerateData();
+		std::cout << "Running every second!" << std::endl;
 	}
 );
 ```
 
-This makes dispatchers ideal for event handlers, recurring engine jobs, and reusable work definitions.
+---
+
+### Using a Specific Pool
+
+```cpp
+auto task = Context::Schedule(
+	1,
+	std::chrono::milliseconds(500),
+	[]()
+	{
+		PollNetworkState();
+	}
+);
+```
+
+---
+
+### Delayed First Execution
+
+```cpp
+auto task = Context::Schedule(
+	std::chrono::milliseconds(1000),
+	[]()
+	{
+		Heartbeat();
+	},
+	std::chrono::steady_clock::now() + std::chrono::milliseconds(2000)
+);
+```
+
+---
+
+### Cancelling a Scheduled Task
+
+```cpp
+task->Cancel();
+```
 
 ---
 
@@ -196,48 +274,24 @@ Example layout:
 
 Tasks are routed to the appropriate pool at dispatch time.
 
-```cpp
-Run<void>(
-	1,
-	ETaskPriority::High,
-	[]()
-	{
-		ReceivePackets();
-	}
-);
-
-Run<void>(
-	2,
-	ETaskPriority::Normal,
-	[]()
-	{
-		LoadTexture();
-	}
-);
-```
-
-This prevents expensive workloads from starving latency-sensitive systems.
-
 ---
 
 ## Worker Threads
 
-Each thread pool owns a collection of worker threads.
-
-Workers continuously process queued tasks according to priority until the Clockwork context is destroyed.
-
-Thread management is fully automatic after initialization.
+Each thread pool owns a set of worker threads managed automatically by the context.
 
 ```cpp
 Context::Create(2, 4);
 ```
 
-Creates:
+This creates:
 
-* Pool 0 with 4 worker threads
-* Pool 1 with 4 worker threads
+* Pool 0 → 4 threads
+* Pool 1 → 4 threads
 
-For a total of 8 workers.
+Total: 8 worker threads.
+
+Workers continuously process queued tasks by priority until the context is destroyed.
 
 ---
 
@@ -259,6 +313,14 @@ int main()
 		}
 	);
 
+	auto scheduled = Context::Schedule(
+		std::chrono::milliseconds(1000),
+		[]()
+		{
+			Tick();
+		}
+	);
+
 	int value = task->Await();
 
 	Context::Destroy();
@@ -270,7 +332,6 @@ int main()
 ---
 
 ## Credits
-
 Developed by [Kevin Bieniek](https://github.com/DeltaGW2) as part of the [Nexus](https://github.com/RaidcoreGG/Nexus) Engine project for [Raidcore](https://raidcore.gg).
 
 Inspiration for the library was drawn from [ArenaNet](https://arena.net/)'s Arch Engine and the general implementation of async in C#.
@@ -278,4 +339,4 @@ Inspiration for the library was drawn from [ArenaNet](https://arena.net/)'s Arch
 ---
 
 ## License
-Clockwork++ is licensed under the MIT license, see [LICENSE](LICENSE) for more information.
+Clockwork++ is licensed under the MIT license. See [LICENSE](LICENSE) for details.
