@@ -28,9 +28,6 @@ namespace Raidcore::Clockwork
 	///----------------------------------------------------------------------------------------------------
 	class ITask
 	{
-		private:
-		std::atomic<bool> IsCancelled{ false };
-
 		public:
 		///----------------------------------------------------------------------------------------------------
 		/// Cancel:
@@ -40,6 +37,8 @@ namespace Raidcore::Clockwork
 
 		private:
 		friend class Raidcore::Clockwork::Context;
+
+		std::atomic<bool> IsCancelled{ false };
 
 		///----------------------------------------------------------------------------------------------------
 		/// Execute:

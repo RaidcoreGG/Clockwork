@@ -9,6 +9,7 @@
 #pragma once
 
 #include <assert.h>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
@@ -50,11 +51,31 @@ namespace Raidcore::Clockwork
 		///----------------------------------------------------------------------------------------------------
 		struct Threadpool
 		{
-			std::vector<std::thread>           Threads{};
+			std::vector<std::thread>                    Threads{};
 
-			std::mutex                         TaskMutex{};
-			std::condition_variable            TaskConVar{};
-			std::queue<std::shared_ptr<ITask>> TaskQueue[static_cast<uint32_t>(ETaskPriority::COUNT)]{};
+			std::mutex                                  TaskMutex{};
+			std::condition_variable                     TaskConVar{};
+			std::queue<std::shared_ptr<ITask>>          TaskQueue[static_cast<uint32_t>(ETaskPriority::COUNT)]{};
+
+			///----------------------------------------------------------------------------------------------------
+			/// ScheduledTaskCompare Struct
+			///----------------------------------------------------------------------------------------------------
+			struct ScheduledTaskCompare
+			{
+				bool operator()(const std::shared_ptr<ScheduledTask>& a, const std::shared_ptr<ScheduledTask>& b) const
+				{
+					return a->GetNextExecution() > b->GetNextExecution();
+				}
+			};
+
+			std::thread                                 SchedulerThread{};
+			std::mutex                                  SchedulerMutex{};
+			std::condition_variable                     SchedulerConVar{};
+			std::priority_queue<
+				std::shared_ptr<ScheduledTask>,
+				std::vector<std::shared_ptr<ScheduledTask>>,
+				ScheduledTaskCompare
+			> ScheduledTasks;
 		};
 
 		public:
@@ -87,6 +108,12 @@ namespace Raidcore::Clockwork
 		/// 	Queues a task to the threadpool, waiting for completion.
 		///----------------------------------------------------------------------------------------------------
 		void QueueTask(uint32_t aPool, ETaskPriority aPriority, std::shared_ptr<ITask> aTask);
+
+		///----------------------------------------------------------------------------------------------------
+		/// Schedule:
+		/// 	Schedules a recurring action.
+		///----------------------------------------------------------------------------------------------------
+		void Schedule(uint32_t aPool, std::shared_ptr<ScheduledTask> aTask);
 		
 		Context(Context const&) = delete;
 		void operator=(Context const&) = delete;
@@ -118,6 +145,18 @@ namespace Raidcore::Clockwork
 		/// 	Loop function for the worker threads.
 		///----------------------------------------------------------------------------------------------------
 		void WorkerLoop(Threadpool* aPool);
+
+		///----------------------------------------------------------------------------------------------------
+		/// SchedulerSetup:
+		/// 	Setup function for the schedculer threads.
+		///----------------------------------------------------------------------------------------------------
+		void SchedulerSetup(uint32_t aPool);
+
+		///----------------------------------------------------------------------------------------------------
+		///	SchedulerLoop:
+		/// 	Loop function for the scheduler threads.
+		///----------------------------------------------------------------------------------------------------
+		void SchedulerLoop(Threadpool* aPool);
 	};
 
 	///----------------------------------------------------------------------------------------------------
@@ -151,9 +190,33 @@ namespace Raidcore::Clockwork
 	/// Schedule:
 	/// 	Schedules a recurring action and returns a Task object associated with it.
 	///----------------------------------------------------------------------------------------------------
-	/*static std::shared_ptr<ScheduledTask> Schedule(uint64_t aIntervalMs, WorkAction aAction)
+	static std::shared_ptr<ScheduledTask> Schedule(
+		uint32_t                              aPool,
+		std::chrono::milliseconds             aInterval,
+		Action<void>                          aAction,
+		std::chrono::steady_clock::time_point aFirstExecution = std::chrono::steady_clock::now()
+	)
 	{
 		Context* ctx = Context::Get();
 		RC_ASSERT(ctx);
-	}*/
+
+		std::shared_ptr<ScheduledTask> task = std::make_shared<ScheduledTask>(aInterval, aAction, aFirstExecution);
+
+		ctx->Schedule(aPool, task);
+
+		return task;
+	}
+
+	///----------------------------------------------------------------------------------------------------
+	/// Schedule:
+	/// 	Schedules a recurring action and returns a Task object associated with it.
+	///----------------------------------------------------------------------------------------------------
+	static std::shared_ptr<ScheduledTask> Schedule(
+		std::chrono::milliseconds             aInterval,
+		Action<void>                          aAction,
+		std::chrono::steady_clock::time_point aFirstExecution = std::chrono::steady_clock::now()
+	)
+	{
+		return Raidcore::Clockwork::Schedule(0, aInterval, aAction, aFirstExecution);
+	}
 }

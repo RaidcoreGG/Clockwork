@@ -81,6 +81,11 @@ namespace Raidcore::Clockwork
 		private:
 		friend class Raidcore::Clockwork::Context;
 
+		Action<T>             Method{};
+
+		std::promise<T>       Promise;
+		std::shared_future<T> Future;
+
 		///----------------------------------------------------------------------------------------------------
 		/// Execute:
 		/// 	Executes the method associated with the task.
@@ -104,11 +109,5 @@ namespace Raidcore::Clockwork
 				this->Promise.set_exception(std::current_exception());
 			}
 		}
-
-		private:
-		Action<T>             Method{};
-
-		std::promise<T>       Promise;
-		std::shared_future<T> Future;
 	};
 }

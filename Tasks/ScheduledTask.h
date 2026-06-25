@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <chrono>
+
 #include "TaskBase.h"
 
 ///----------------------------------------------------------------------------------------------------
@@ -20,8 +22,59 @@ namespace Raidcore::Clockwork
 	///----------------------------------------------------------------------------------------------------
 	class ScheduledTask : public virtual ITask
 	{
+		public:
+		///----------------------------------------------------------------------------------------------------
+		/// ctor
+		///----------------------------------------------------------------------------------------------------
+		ScheduledTask(
+			std::chrono::milliseconds aInterval,
+			Action<void> aAction,
+			std::chrono::steady_clock::time_point aFirstExecution = std::chrono::steady_clock::now()
+		)
+			: NextExecution(aFirstExecution)
+			, Interval(aInterval)
+			, Method(std::move(aAction))
+		{}
+
+		///----------------------------------------------------------------------------------------------------
+		/// GetNextExecution:
+		/// 	Gets the time point of the next execution of the scheduled task.
+		///----------------------------------------------------------------------------------------------------
+		std::chrono::steady_clock::time_point GetNextExecution() const
+		{
+			return this->NextExecution;
+		}
+
 		private:
-		uint64_t     IntervalMs{ 0 };
-		Action<void> Method{};
+		friend class Raidcore::Clockwork::Context;
+
+		std::chrono::steady_clock::time_point NextExecution{};
+		std::chrono::milliseconds             Interval{ 0 };
+		Action<void>                          Method{};
+
+		///----------------------------------------------------------------------------------------------------
+		/// Reschedule:
+		/// 	Reschedules the execution of the task by adding the interval to the next execution time.
+		///----------------------------------------------------------------------------------------------------
+		void Reschedule()
+		{
+			this->NextExecution += this->Interval;
+		}
+
+		///----------------------------------------------------------------------------------------------------
+		/// Execute:
+		/// 	Executes the method associated with the task.
+		///----------------------------------------------------------------------------------------------------
+		void Execute(CancellationToken aToken) override
+		{
+			try
+			{
+				this->Method(aToken);
+			}
+			catch (...)
+			{
+				/* NOP */
+			}
+		}
 	};
 }
