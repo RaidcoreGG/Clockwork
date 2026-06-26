@@ -33,7 +33,10 @@ namespace Raidcore::Clockwork
 		/// Cancel:
 		/// 	Cancels the task, without yielding the result.
 		///----------------------------------------------------------------------------------------------------
-		void Cancel();
+		inline void Cancel()
+		{
+			this->IsCancelled.store(true);
+		}
 
 		private:
 		friend class Raidcore::Clockwork::Context;
